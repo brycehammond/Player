@@ -196,7 +196,7 @@ public class Player: UIViewController {
         } set {
             if let playerItem = self.playerItem {
                 playerItem.cancelPendingSeeks()
-                self.player.seekToTime(self.currentTime)
+                self.player.seekToTime(newValue)
             }
             
         }

@@ -77,8 +77,6 @@ public protocol PlayerDelegate {
 
     func playerPlaybackWillStartFromBeginning(player: Player)
     func playerPlaybackDidEnd(player: Player)
-    
-    func playerCurrentTimeUpdated(player: Player, currentTime: CMTime)
 }
 
 // KVO contexts
@@ -185,6 +183,12 @@ public class Player: UIViewController {
     public var currentTime : CMTime! {
         get {
             return self.player.currentTime()
+        } set {
+            if let playerItem = self.playerItem {
+                playerItem.cancelPendingSeeks()
+                self.player.seekToTime(self.currentTime)
+            }
+            
         }
     }
 
@@ -194,7 +198,7 @@ public class Player: UIViewController {
     private var player: AVPlayer!
     private var playerView: PlayerView!
     
-    private var timeObserver: AnyObject!
+    private var timeObserver: AnyObject?
 
     // MARK: object lifecycle
 
@@ -206,12 +210,7 @@ public class Player: UIViewController {
         
         let timeUpdateInterval = CMTimeMakeWithSeconds(0.1, Int32(NSEC_PER_SEC))
         
-        self.timeObserver = self.player.addPeriodicTimeObserverForInterval(timeUpdateInterval, queue: dispatch_get_main_queue()) { [weak self] (time) in
-            
-            if let strongSelf = self {
-                strongSelf.delegate.playerCurrentTimeUpdated(strongSelf, currentTime: time)
-            }
-        }
+        
 
         self.playbackLoops = false
         self.playbackFreezesAtEnd = false
@@ -229,7 +228,7 @@ public class Player: UIViewController {
 
     deinit {
         
-        self.player.removeTimeObserver(self.timeObserver)
+        self.removeTimeObserver()
         
         self.playerView.player = nil
         self.delegate = nil
@@ -299,6 +298,21 @@ public class Player: UIViewController {
         self.playbackState = .Stopped
         self.delegate?.playerPlaybackStateDidChange(self)
         self.delegate?.playerPlaybackDidEnd(self)
+    }
+    
+    public func addPeriodicTimeObserverForInterval(interval: CMTime, usingBlock block: ((CMTime) -> Void)!) {
+        
+        self.removeTimeObserver()
+        self.timeObserver = self.player.addPeriodicTimeObserverForInterval(interval, queue: dispatch_get_main_queue(), usingBlock: block)
+    }
+    
+    public func removeTimeObserver() {
+        
+        if let observer: AnyObject = self.timeObserver {
+            self.player.removeTimeObserver(observer)
+            self.timeObserver = nil
+        }
+        
     }
 
     // MARK: private setup

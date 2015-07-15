@@ -77,6 +77,8 @@ public protocol PlayerDelegate {
 
     func playerPlaybackWillStartFromBeginning(player: Player)
     func playerPlaybackDidEnd(player: Player)
+    
+    func playerCurrentTimeUpdated(player: Player, currentTime: CMTime)
 }
 
 // KVO contexts
@@ -179,12 +181,20 @@ public class Player: UIViewController {
             }
         }
     }
+    
+    public var currentTime : CMTime! {
+        get {
+            return self.player.currentTime()
+        }
+    }
 
     private var asset: AVAsset!
     private var playerItem: AVPlayerItem?
 
     private var player: AVPlayer!
     private var playerView: PlayerView!
+    
+    private var timeObserver: AnyObject!
 
     // MARK: object lifecycle
 
@@ -193,6 +203,15 @@ public class Player: UIViewController {
         self.player = AVPlayer()
         self.player.actionAtItemEnd = .Pause
         self.player.addObserver(self, forKeyPath: PlayerRateKey, options: (NSKeyValueObservingOptions.New | NSKeyValueObservingOptions.Old) , context: &PlayerObserverContext)
+        
+        let timeUpdateInterval = CMTimeMakeWithSeconds(0.1, Int32(NSEC_PER_SEC))
+        
+        self.timeObserver = self.player.addPeriodicTimeObserverForInterval(timeUpdateInterval, queue: dispatch_get_main_queue()) { [weak self] (time) in
+            
+            if let strongSelf = self {
+                strongSelf.delegate.playerCurrentTimeUpdated(strongSelf, currentTime: time)
+            }
+        }
 
         self.playbackLoops = false
         self.playbackFreezesAtEnd = false
@@ -209,6 +228,9 @@ public class Player: UIViewController {
     }
 
     deinit {
+        
+        self.player.removeTimeObserver(self.timeObserver)
+        
         self.playerView.player = nil
         self.delegate = nil
 

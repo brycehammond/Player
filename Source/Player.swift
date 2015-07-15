@@ -145,6 +145,15 @@ public class Player: UIViewController {
         }
     }
     
+    public var rate: Float! {
+        get {
+            return self.player.rate
+        }
+        set {
+            self.player.rate = newValue
+        }
+    }
+    
     public var fillMode: String! {
         get {
             return self.playerView.fillMode
@@ -166,6 +175,7 @@ public class Player: UIViewController {
             }
         }
     }
+    
     public var playbackFreezesAtEnd: Bool!
     public var playbackState: PlaybackState!
     public var bufferingState: BufferingState!

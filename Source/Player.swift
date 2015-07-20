@@ -217,11 +217,8 @@ public class Player: UIViewController {
         self.player = AVPlayer()
         self.player.actionAtItemEnd = .Pause
         self.player.addObserver(self, forKeyPath: PlayerRateKey, options: (NSKeyValueObservingOptions.New | NSKeyValueObservingOptions.Old) , context: &PlayerObserverContext)
+        self.player.addObserver(self, forKeyPath: PlayerStatusKey, options: (NSKeyValueObservingOptions.New | NSKeyValueObservingOptions.Old) , context: &PlayerObserverContext)
         
-        let timeUpdateInterval = CMTimeMakeWithSeconds(0.1, Int32(NSEC_PER_SEC))
-        
-        
-
         self.playbackLoops = false
         self.playbackFreezesAtEnd = false
         self.playbackState = .Stopped
@@ -248,6 +245,7 @@ public class Player: UIViewController {
         self.playerView.layer.removeObserver(self, forKeyPath: PlayerReadyForDisplay, context: &PlayerLayerObserverContext)
 
         self.player.removeObserver(self, forKeyPath: PlayerRateKey, context: &PlayerObserverContext)
+        self.player.removeObserver(self, forKeyPath: PlayerStatusKey, context: &PlayerObserverContext)
 
         self.player.pause()
 
@@ -433,9 +431,33 @@ public class Player: UIViewController {
 
     public override func observeValueForKeyPath(keyPath: String, ofObject object: AnyObject, change: [NSObject : AnyObject], context: UnsafeMutablePointer<Void>) {
 
+        
+        let updatePlayerStateBlock : (([NSObject : AnyObject]) -> Void) = { (change) in
+            let status = (change[NSKeyValueChangeNewKey] as! NSNumber).integerValue as AVPlayerStatus.RawValue
+            
+            switch (status) {
+            case AVPlayerStatus.ReadyToPlay.rawValue:
+                self.playerView.playerLayer.player = self.player
+                self.playerView.playerLayer.hidden = false
+            case AVPlayerStatus.Failed.rawValue:
+                self.playbackState = PlaybackState.Failed
+                self.delegate?.playerPlaybackStateDidChange(self)
+            default:
+                true
+            }
+        }
+        
         switch (keyPath, context) {
             case (PlayerRateKey, &PlayerObserverContext):
                 true
+            case (PlayerStatusKey, &PlayerObserverContext):
+                
+                if self.player.status == .ReadyToPlay && self.playbackState == .Playing {
+                    self.playFromCurrentTime()
+                }
+                
+                updatePlayerStateBlock(change)
+            
             case (PlayerStatusKey, &PlayerItemObserverContext):
                 true
             case (PlayerKeepUp, &PlayerItemObserverContext):
@@ -448,18 +470,8 @@ public class Player: UIViewController {
                     }
                 }
 
-                let status = (change[NSKeyValueChangeNewKey] as! NSNumber).integerValue as AVPlayerStatus.RawValue
-
-                switch (status) {
-                    case AVPlayerStatus.ReadyToPlay.rawValue:
-                        self.playerView.playerLayer.player = self.player
-                        self.playerView.playerLayer.hidden = false
-                    case AVPlayerStatus.Failed.rawValue:
-                        self.playbackState = PlaybackState.Failed
-                        self.delegate?.playerPlaybackStateDidChange(self)
-                    default:
-                        true
-                }
+                updatePlayerStateBlock(change)
+            
             case (PlayerEmptyBufferKey, &PlayerItemObserverContext):
                 if let item = self.playerItem {
                     if item.playbackBufferEmpty {
@@ -468,18 +480,8 @@ public class Player: UIViewController {
                     }
                 }
 
-                let status = (change[NSKeyValueChangeNewKey] as! NSNumber).integerValue as AVPlayerStatus.RawValue
-
-                switch (status) {
-                    case AVPlayerStatus.ReadyToPlay.rawValue:
-                        self.playerView.playerLayer.player = self.player
-                        self.playerView.playerLayer.hidden = false
-                    case AVPlayerStatus.Failed.rawValue:
-                        self.playbackState = PlaybackState.Failed
-                        self.delegate?.playerPlaybackStateDidChange(self)
-                    default:
-                        true
-                }
+                updatePlayerStateBlock(change)
+            
             case (PlayerReadyForDisplay, &PlayerLayerObserverContext):
                 if self.playerView.playerLayer.readyForDisplay {
                     self.delegate?.playerReady(self)

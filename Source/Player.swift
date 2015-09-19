@@ -122,16 +122,12 @@ public class Player: UIViewController {
             self.setupPlayerItem(nil)
 
             filepath = newValue
-            var remoteUrl: NSURL? = NSURL(string: newValue)
+            let remoteUrl: NSURL? = NSURL(string: newValue)
             if remoteUrl != nil && remoteUrl?.scheme != nil {
-                if let asset = AVURLAsset(URL: remoteUrl, options: .None) {
-                    self.setupAsset(asset)
-                }
+                self.setupAsset(AVURLAsset(URL: remoteUrl!, options: .None))
             } else {
-                var localURL: NSURL? = NSURL(fileURLWithPath: newValue)
-                if let asset = AVURLAsset(URL: localURL, options: .None) {
-                    self.setupAsset(asset)
-                }
+                let localURL: NSURL? = NSURL(fileURLWithPath: newValue)
+                self.setupAsset(AVURLAsset(URL: localURL!, options: .None))
             }
         }
     }
@@ -334,7 +330,7 @@ public class Player: UIViewController {
         self.delegate?.playerBufferingStateDidChange(self)
 
         self.asset = asset
-        if let updatedAsset = self.asset {
+        if let _ = self.asset {
             self.setupPlayerItem(nil)
         }
 
@@ -447,7 +443,8 @@ public class Player: UIViewController {
             }
         }
         
-        switch (keyPath, context) {
+        if let key = keyPath {
+            switch (key, context) {
             case (PlayerRateKey, &PlayerObserverContext):
                 true
             case (PlayerStatusKey, &PlayerObserverContext):
@@ -456,22 +453,22 @@ public class Player: UIViewController {
                     self.playFromCurrentTime()
                 }
                 
-                updatePlayerStateBlock(change)
-            
+                updatePlayerStateBlock(change!)
+                
             case (PlayerStatusKey, &PlayerItemObserverContext):
                 true
             case (PlayerKeepUp, &PlayerItemObserverContext):
                 if let item = self.playerItem {
                     self.bufferingState = .Ready
                     self.delegate?.playerBufferingStateDidChange(self)
-
+                    
                     if item.playbackLikelyToKeepUp && self.playbackState == .Playing {
                         self.playFromCurrentTime()
                     }
                 }
-
-                updatePlayerStateBlock(change)
-            
+                
+                updatePlayerStateBlock(change!)
+                
             case (PlayerEmptyBufferKey, &PlayerItemObserverContext):
                 if let item = self.playerItem {
                     if item.playbackBufferEmpty {
@@ -479,18 +476,18 @@ public class Player: UIViewController {
                         self.delegate?.playerBufferingStateDidChange(self)
                     }
                 }
-
-                updatePlayerStateBlock(change)
-            
+                
+                updatePlayerStateBlock(change!)
+                
             case (PlayerReadyForDisplay, &PlayerLayerObserverContext):
                 if self.playerView.playerLayer.readyForDisplay {
                     self.delegate?.playerReady(self)
                 }
             default:
                 super.observeValueForKeyPath(keyPath, ofObject: object, change: change, context: context)
-
+                
+            }
         }
-
     }
 
 }

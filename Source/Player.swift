@@ -124,10 +124,12 @@ public class Player: UIViewController {
             filepath = newValue
             let remoteUrl: NSURL? = NSURL(string: newValue)
             if remoteUrl != nil && remoteUrl?.scheme != nil {
-                self.setupAsset(AVURLAsset(URL: remoteUrl!, options: .None))
+                let asset = AVURLAsset(URL: remoteUrl!, options: .None)
+                self.setupAsset(asset)
             } else {
                 let localURL: NSURL? = NSURL(fileURLWithPath: newValue)
-                self.setupAsset(AVURLAsset(URL: localURL!, options: .None))
+                let asset = AVURLAsset(URL: localURL!, options: .None)
+                self.setupAsset(asset)
             }
         }
     }
@@ -214,31 +216,22 @@ public class Player: UIViewController {
         self.player.actionAtItemEnd = .Pause
         self.player.addObserver(self, forKeyPath: PlayerRateKey, options: ([NSKeyValueObservingOptions.New, NSKeyValueObservingOptions.Old]) , context: &PlayerObserverContext)
         self.player.addObserver(self, forKeyPath: PlayerStatusKey, options: ([NSKeyValueObservingOptions.New, NSKeyValueObservingOptions.Old]) , context: &PlayerObserverContext)
-        
+
         self.playbackLoops = false
         self.playbackFreezesAtEnd = false
         self.playbackState = .Stopped
         self.bufferingState = .Unknown
     }
 
-    public required init?(coder aDecoder: NSCoder) {
-        super.init(coder: aDecoder)
-    }
-
-    public override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: NSBundle?) {
-        super.init(nibName: nibNameOrNil, bundle: nibBundleOrNil)
-    }
-
     deinit {
         
         self.removeTimeObserver()
-        
-        self.playerView.player = nil
+        self.playerView?.player = nil
         self.delegate = nil
 
         NSNotificationCenter.defaultCenter().removeObserver(self)
 
-        self.playerView.layer.removeObserver(self, forKeyPath: PlayerReadyForDisplay, context: &PlayerLayerObserverContext)
+        self.playerView?.layer.removeObserver(self, forKeyPath: PlayerReadyForDisplay, context: &PlayerLayerObserverContext)
 
         self.player.removeObserver(self, forKeyPath: PlayerRateKey, context: &PlayerObserverContext)
         self.player.removeObserver(self, forKeyPath: PlayerStatusKey, context: &PlayerObserverContext)
@@ -363,9 +356,7 @@ public class Player: UIViewController {
     }
 
     private func setupPlayerItem(playerItem: AVPlayerItem?) {
-        let item = playerItem
-
-        if item == nil {
+        if self.playerItem != nil {
             self.playerItem?.removeObserver(self, forKeyPath: PlayerEmptyBufferKey, context: &PlayerItemObserverContext)
             self.playerItem?.removeObserver(self, forKeyPath: PlayerKeepUp, context: &PlayerItemObserverContext)
             self.playerItem?.removeObserver(self, forKeyPath: PlayerStatusKey, context: &PlayerItemObserverContext)
@@ -374,9 +365,9 @@ public class Player: UIViewController {
             NSNotificationCenter.defaultCenter().removeObserver(self, name: AVPlayerItemFailedToPlayToEndTimeNotification, object: self.playerItem)
         }
 
-        self.playerItem = item
+        self.playerItem = playerItem
 
-        if item != nil {
+        if self.playerItem != nil {
             self.playerItem?.addObserver(self, forKeyPath: PlayerEmptyBufferKey, options: ([NSKeyValueObservingOptions.New, NSKeyValueObservingOptions.Old]), context: &PlayerItemObserverContext)
             self.playerItem?.addObserver(self, forKeyPath: PlayerKeepUp, options: ([NSKeyValueObservingOptions.New, NSKeyValueObservingOptions.Old]), context: &PlayerItemObserverContext)
             self.playerItem?.addObserver(self, forKeyPath: PlayerStatusKey, options: ([NSKeyValueObservingOptions.New, NSKeyValueObservingOptions.Old]), context: &PlayerItemObserverContext)
@@ -425,7 +416,7 @@ public class Player: UIViewController {
 
     // MARK: KVO
 
-    public override func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [String : AnyObject]?, context: UnsafeMutablePointer<Void>) {
+    override public func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [String : AnyObject]?, context: UnsafeMutablePointer<Void>) {
 
         
         let updatePlayerStateBlock : (([NSObject : AnyObject]) -> Void) = { (change) in
@@ -457,7 +448,7 @@ public class Player: UIViewController {
                 
             case (PlayerStatusKey, &PlayerItemObserverContext):
                 true
-            case (PlayerKeepUp, &PlayerItemObserverContext):
+            case (.Some(PlayerKeepUp), &PlayerItemObserverContext):
                 if let item = self.playerItem {
                     self.bufferingState = .Ready
                     self.delegate?.playerBufferingStateDidChange(self)
@@ -466,7 +457,7 @@ public class Player: UIViewController {
                         self.playFromCurrentTime()
                     }
                 }
-                
+
                 updatePlayerStateBlock(change!)
                 
             case (PlayerEmptyBufferKey, &PlayerItemObserverContext):
@@ -478,8 +469,7 @@ public class Player: UIViewController {
                 }
                 
                 updatePlayerStateBlock(change!)
-                
-            case (PlayerReadyForDisplay, &PlayerLayerObserverContext):
+
                 if self.playerView.playerLayer.readyForDisplay {
                     self.delegate?.playerReady(self)
                 }

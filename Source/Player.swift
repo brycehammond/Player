@@ -448,7 +448,7 @@ public class Player: UIViewController {
                 
             case (PlayerStatusKey, &PlayerItemObserverContext):
                 true
-            case (.Some(PlayerKeepUp), &PlayerItemObserverContext):
+            case (PlayerKeepUp, &PlayerItemObserverContext):
                 if let item = self.playerItem {
                     self.bufferingState = .Ready
                     self.delegate?.playerBufferingStateDidChange(self)

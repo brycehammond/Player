@@ -419,18 +419,21 @@ public class Player: UIViewController {
     override public func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [String : AnyObject]?, context: UnsafeMutablePointer<Void>) {
 
         
-        let updatePlayerStateBlock : (([NSObject : AnyObject]) -> Void) = { (change) in
-            let status = (change[NSKeyValueChangeNewKey] as! NSNumber).integerValue as AVPlayerStatus.RawValue
+        let updatePlayerStateBlock : (([NSObject : AnyObject]?) -> Void) = { (change) in
             
-            switch (status) {
-            case AVPlayerStatus.ReadyToPlay.rawValue:
-                self.playerView.playerLayer.player = self.player
-                self.playerView.playerLayer.hidden = false
-            case AVPlayerStatus.Failed.rawValue:
-                self.playbackState = PlaybackState.Failed
-                self.delegate?.playerPlaybackStateDidChange(self)
-            default:
-                true
+            if let changeValues = change {
+                let status = (changeValues[NSKeyValueChangeNewKey] as! NSNumber).integerValue as AVPlayerStatus.RawValue
+                
+                switch (status) {
+                case AVPlayerStatus.ReadyToPlay.rawValue:
+                    self.playerView.playerLayer.player = self.player
+                    self.playerView.playerLayer.hidden = false
+                case AVPlayerStatus.Failed.rawValue:
+                    self.playbackState = PlaybackState.Failed
+                    self.delegate?.playerPlaybackStateDidChange(self)
+                default:
+                    true
+                }
             }
         }
         
@@ -444,7 +447,7 @@ public class Player: UIViewController {
                     self.playFromCurrentTime()
                 }
                 
-                updatePlayerStateBlock(change!)
+                updatePlayerStateBlock(change)
                 
             case (PlayerStatusKey, &PlayerItemObserverContext):
                 true
@@ -458,7 +461,7 @@ public class Player: UIViewController {
                     }
                 }
 
-                updatePlayerStateBlock(change!)
+                updatePlayerStateBlock(change)
                 
             case (PlayerEmptyBufferKey, &PlayerItemObserverContext):
                 if let item = self.playerItem {
@@ -468,13 +471,13 @@ public class Player: UIViewController {
                     }
                 }
                 
-                updatePlayerStateBlock(change!)
+                updatePlayerStateBlock(change)
 
                 if self.playerView.playerLayer.readyForDisplay {
                     self.delegate?.playerReady(self)
                 }
             default:
-                super.observeValueForKeyPath(keyPath, ofObject: object, change: change, context: context)
+                true
                 
             }
         }

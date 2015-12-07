@@ -108,32 +108,17 @@ public class Player: UIViewController {
 
     public var delegate: PlayerDelegate!
 
-    private var filepath: String!
-    public var path: String! {
-        get {
-            return filepath
+    public func setUrl(url: NSURL) {
+        // Make sure everything is reset beforehand
+        if(self.playbackState == .Playing){
+            self.pause()
         }
-        set {
-            // Make sure everything is reset beforehand
-            if(self.playbackState == .Playing){
-                self.pause()
-            }
-
-            self.setupPlayerItem(nil)
-
-            filepath = newValue
-            let remoteUrl: NSURL? = NSURL(string: newValue)
-            if remoteUrl != nil && remoteUrl?.scheme != nil {
-                let asset = AVURLAsset(URL: remoteUrl!, options: .None)
-                self.setupAsset(asset)
-            } else {
-                let localURL: NSURL? = NSURL(fileURLWithPath: newValue)
-                let asset = AVURLAsset(URL: localURL!, options: .None)
-                self.setupAsset(asset)
-            }
-        }
+        self.setupPlayerItem(nil)
+        let asset = AVURLAsset(URL: url, options: .None)
+        self.setupAsset(asset)
     }
-    
+
+
     public var muted: Bool! {
         get {
             return self.player.muted
@@ -151,7 +136,7 @@ public class Player: UIViewController {
             self.player.rate = newValue
         }
     }
-    
+
     public var fillMode: String! {
         get {
             return self.playerView.fillMode
@@ -417,9 +402,8 @@ public class Player: UIViewController {
     // MARK: KVO
 
     override public func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [String : AnyObject]?, context: UnsafeMutablePointer<Void>) {
-
         
-        let updatePlayerStateBlock : (([NSObject : AnyObject]?) -> Void) = { (change) in
+        let updatePlayerState : (Void) -> Void = {
             
             if let changeValues = change {
                 let status = (changeValues[NSKeyValueChangeNewKey] as! NSNumber).integerValue as AVPlayerStatus.RawValue
@@ -437,49 +421,41 @@ public class Player: UIViewController {
             }
         }
         
-        if let key = keyPath {
-            switch (key, context) {
-            case (PlayerRateKey, &PlayerObserverContext):
-                true
-            case (PlayerStatusKey, &PlayerObserverContext):
+        switch (keyPath, context) {
+        case (.Some(PlayerRateKey), &PlayerObserverContext):
+            true
+        case (.Some(PlayerStatusKey), &PlayerObserverContext):
+            if self.player.status == .ReadyToPlay && self.playbackState == .Playing {
+                self.playFromCurrentTime()
+            }
+            updatePlayerState()
+        case (.Some(PlayerStatusKey), &PlayerItemObserverContext):
+            true
+        case (.Some(PlayerKeepUp), &PlayerItemObserverContext):
+            if let item = self.playerItem {
+                self.bufferingState = .Ready
+                self.delegate?.playerBufferingStateDidChange(self)
                 
-                if self.player.status == .ReadyToPlay && self.playbackState == .Playing {
+                if item.playbackLikelyToKeepUp && self.playbackState == .Playing {
                     self.playFromCurrentTime()
                 }
-                
-                updatePlayerStateBlock(change)
-                
-            case (PlayerStatusKey, &PlayerItemObserverContext):
-                true
-            case (PlayerKeepUp, &PlayerItemObserverContext):
-                if let item = self.playerItem {
-                    self.bufferingState = .Ready
-                    self.delegate?.playerBufferingStateDidChange(self)
-                    
-                    if item.playbackLikelyToKeepUp && self.playbackState == .Playing {
-                        self.playFromCurrentTime()
-                    }
-                }
-
-                updatePlayerStateBlock(change)
-                
-            case (PlayerEmptyBufferKey, &PlayerItemObserverContext):
-                if let item = self.playerItem {
-                    if item.playbackBufferEmpty {
-                        self.bufferingState = .Delayed
-                        self.delegate?.playerBufferingStateDidChange(self)
-                    }
-                }
-                
-                updatePlayerStateBlock(change)
-
-                if self.playerView.playerLayer.readyForDisplay {
-                    self.delegate?.playerReady(self)
-                }
-            default:
-                true
-                
             }
+            updatePlayerState()
+        case (.Some(PlayerEmptyBufferKey), &PlayerItemObserverContext):
+            if let item = self.playerItem {
+                if item.playbackBufferEmpty {
+                    self.bufferingState = .Delayed
+                    self.delegate?.playerBufferingStateDidChange(self)
+                }
+            }
+            updatePlayerState()
+        case (.Some(PlayerReadyForDisplay), &PlayerLayerObserverContext):
+            if self.playerView.playerLayer.readyForDisplay {
+                self.delegate?.playerReady(self)
+            }
+        default:
+            super.observeValueForKeyPath(keyPath, ofObject: object, change: change, context: context)
+
         }
     }
 

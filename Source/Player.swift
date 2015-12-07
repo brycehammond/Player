@@ -118,6 +118,14 @@ public class Player: UIViewController {
         self.setupAsset(asset)
     }
 
+    public var assetURL : NSURL? {
+        
+        get {
+            return self.asset?.URL
+        }
+        
+    }
+    
 
     public var muted: Bool! {
         get {
@@ -185,7 +193,7 @@ public class Player: UIViewController {
         }
     }
 
-    private var asset: AVAsset!
+    private var asset: AVURLAsset?
     private var playerItem: AVPlayerItem?
 
     private var player: AVPlayer!
@@ -299,7 +307,7 @@ public class Player: UIViewController {
 
     // MARK: private setup
 
-    private func setupAsset(asset: AVAsset) {
+    private func setupAsset(asset: AVURLAsset) {
         if self.playbackState == .Playing {
             self.pause()
         }
@@ -308,36 +316,38 @@ public class Player: UIViewController {
         self.delegate?.playerBufferingStateDidChange(self)
 
         self.asset = asset
-        if let _ = self.asset {
+        if let asset = self.asset {
             self.setupPlayerItem(nil)
-        }
-
-        let keys: [String] = [PlayerTracksKey, PlayerPlayableKey, PlayerDurationKey]
-
-        self.asset.loadValuesAsynchronouslyForKeys(keys, completionHandler: { () -> Void in
-            dispatch_sync(dispatch_get_main_queue(), { () -> Void in
-
-                for key in keys {
-                    var error: NSError?
-                    let status = self.asset.statusOfValueForKey(key, error:&error)
-                    if status == .Failed {
+            
+            let keys: [String] = [PlayerTracksKey, PlayerPlayableKey, PlayerDurationKey]
+            
+            asset.loadValuesAsynchronouslyForKeys(keys, completionHandler: { () -> Void in
+                dispatch_sync(dispatch_get_main_queue(), { () -> Void in
+                    
+                    for key in keys {
+                        var error: NSError?
+                        let status = asset.statusOfValueForKey(key, error:&error)
+                        if status == .Failed {
+                            self.playbackState = .Failed
+                            self.delegate?.playerPlaybackStateDidChange(self)
+                            return
+                        }
+                    }
+                    
+                    if asset.playable.boolValue == false {
                         self.playbackState = .Failed
                         self.delegate?.playerPlaybackStateDidChange(self)
                         return
                     }
-                }
-
-                if self.asset.playable.boolValue == false {
-                    self.playbackState = .Failed
-                    self.delegate?.playerPlaybackStateDidChange(self)
-                    return
-                }
-
-                let playerItem: AVPlayerItem = AVPlayerItem(asset:self.asset)
-                self.setupPlayerItem(playerItem)
-
+                    
+                    let playerItem: AVPlayerItem = AVPlayerItem(asset: asset)
+                    self.setupPlayerItem(playerItem)
+                    
+                })
             })
-        })
+        }
+
+        
     }
 
     private func setupPlayerItem(playerItem: AVPlayerItem?) {
